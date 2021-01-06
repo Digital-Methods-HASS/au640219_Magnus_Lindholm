@@ -1,0 +1,53 @@
+---
+title: "Wikiquote  eventparsing"
+author: "Magnus Lindholm Nielsen"
+date: "08-01-2021"
+output:
+  word_document: default
+  html_document: default
+---
+
+```{r}
+library(XML)
+```
+
+In this document, i will demonstrate how to utilize event-driven parsing to extract relevant data from wikiqoute. This will serve to demonstrate how one can utilize event-driven parsing to work with large XML files on hardware with limited resources. We will utilize the XML package to contextualize these.
+
+Firstly, we run a normal DOM style parser:
+
+```{r}
+file <- "enwikiquote-20201101-abstract.xml"
+doc1 = xmlParse(file)
+DOMDoc <- xmlToDataFrame(doc1)
+```
+This is rather effective and easy on the small document we have here, but we also end op having to deal with the long URL's attached to each part of the site. This is not at problem on such a small scale. But if we where to run this on a much larger document (between 1-2Gb depending on your system), R would have significant problems loading in the file and creating the data frame. Certain files would be directly impossible to import into  R.
+
+The final dataframe also contains a lot of data. Depending on your research question, much of it might be of no interest to you, and is just taking op space on your hard drive and in your memory. 
+
+This is where event-driven parsing can be give you a clear advantage. In the code below, i utilize event-driven parsing on the same document, but only make a data frame consisting of the two columns 'title' and 'abstract'.
+The code is adapted from 'Automated Data Collection with R' page 66-68:
+
+```{r}
+branchWiki <- function(){
+  title_container <- c()
+  abstract_container <- c()
+  'doc' = function(node,...){
+    title <- xmlValue(xmlChildren(node)[[c('title')]])
+    title_container <<- c(title_container, title)
+    abstract <- xmlValue(xmlChildren(node)[[c('abstract')]])
+    abstract_container <<- c(abstract_container, abstract)
+    }
+  getContainer <- function() data.frame(title = title_container, abstract = abstract_container)
+  list(doc = doc, getStore = getContainer)
+}
+h1 <- branchWiki()
+file <- "enwikiquote-20201101-abstract.xml"
+xmlEventParse(file, branches = h1, handlers = list())
+wiki_quot <- h1$getStore()
+```
+And if we take a look at the top of the data frame:
+```{r}
+head(wiki_quot)
+```
+
+We can see, that the code has successfully avoided using resources on the parts of the .XML file we did not want to utilize for this here.
